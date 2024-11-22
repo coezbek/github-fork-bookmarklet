@@ -77,6 +77,84 @@ javascript:(async () => {
 3. Paste the Javascript above as the URL
 4. Visit the network members page of a repo  (click on "Forks" in the right bar, then click on "Switch to tree view") and click the bookmark.
 
+# Adapted bookmarket for the Forks page
+
+The new default page for forks (`https://github.com/<user>/<repo>/forks`) is a different structure. Handling both in a single bookmarklet would be too long. Thus a second version just for the forks pages:
+
+```js
+javascript:(async () => {
+    try {
+        /**
+         * Fetch branch information for a given user/repo
+         * @param {string} user - GitHub username
+         * @param {string} repo - Repository name
+         */
+        const fetchBranchInfo = async (user, repo) => {
+            try {
+                const res = await fetch(`https://github.com/${user}/${repo}/branch-infobar/main`, {
+                    headers: { accept: 'application/json' }
+                });
+                if (!res.ok) {
+                    throw new Error(`Failed to fetch branch info for ${user}/${repo}`);
+                }
+                const data = await res.json();
+                return data.refComparison;
+            } catch (e) {
+                console.error(`Error fetching branch info for ${user}/${repo}:`, e);
+                return null;
+            }
+        };
+
+        // Select the list of forks on the Forks page
+        const forkList = document.querySelectorAll('ul[data-view-component="true"] > li');
+        if (!forkList.length) {
+            alert('No forks found on this page.');
+            return;
+        }
+
+        // Process each fork
+        for (const forkItem of forkList) {
+            try {
+                // Get the second link (user/repo) from the list item
+                const repoLink = forkItem.querySelector('a[href*="/"]:nth-of-type(2)');
+                if (!repoLink) continue;
+
+                const match = repoLink.href.match(/github\.com\/([^/]+)\/([^/]+)/);
+                if (!match) continue;
+
+                const [, user, repo] = match;
+
+                // Fetch branch information
+                const branchInfo = await fetchBranchInfo(user, repo);
+                if (branchInfo) {
+                    const { ahead, behind } = branchInfo;
+                    const infoText = `Ahead: <font color="#0c0">${ahead}</font>, Behind: <font color="red">${behind}</font>`;
+                    
+                    // Create a div to display branch information
+                    const infoDiv = document.createElement('div');
+                    infoDiv.innerHTML = infoText;
+                    infoDiv.style.marginTop = '10px';
+                    infoDiv.style.fontSize = 'small';
+
+                    // Add the branch info div to the fork item
+                    forkItem.appendChild(infoDiv);
+
+                    // Hide the fork item if it is unmodified
+                    if (ahead === 0) {
+                        forkItem.style.display = 'none';
+                    }
+                }
+            } catch (e) {
+                console.error(`Error processing fork item:`, forkItem, e);
+            }
+        }
+    } catch (e) {
+        console.error('Error in bookmarklet execution:', e);
+    }
+})();
+```
+
+
 # References
 
 The idea for this bookmarket originated from this [stackoverflow discussion](https://stackoverflow.com/questions/54868988/how-to-determine-which-forks-on-github-are-ahead) and in particular [this solution by user 'root'](https://stackoverflow.com/a/68335748/278842), which broke when Github made the branch information async.
