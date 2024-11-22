@@ -4,6 +4,8 @@ The Github network member fork page (`https://github.com/<user>/<repo>/network/m
 
 The following bookmarklet will retrieve this information using a call to `https://github.com/${user}/${repo}/branch-infobar/main` and update the list of forks. It will remove all forks which aren't ahead by at least one commit (because these are likely accidental forks).
 
+Caveats: This will take some time unforunately.
+
 ```js
 javascript:(async () => {
     try {
@@ -89,6 +91,8 @@ javascript:(async () => {
 # Adapted bookmarket for the Forks page
 
 The new default page for forks (`https://github.com/<user>/<repo>/forks`) is a different structure. Handling both in a single bookmarklet would be too long. Thus a second version just for the forks pages:
+
+Caveat: The forks page is paginated so you will only see a couple of entries at a time.
 
 ```js
 javascript:(async () => {
