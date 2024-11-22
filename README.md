@@ -75,7 +75,7 @@ javascript:(async () => {
 1. Make a new bookmark in your browser (right-click on the bookmarks bar and click Add Page...)
 2. Assign a useful name e.g. "Github Forks Bookmarklet"
 3. Paste the Javascript above as the URL
-4. Visit network members page of a repo and click the bookmark.
+4. Visit the network members page of a repo  (click on "Forks" in the right bar, then click on "Switch to tree view") and click the bookmark.
 
 # References
 
