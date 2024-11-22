@@ -35,6 +35,9 @@ javascript:(async () => {
             alert('Run this from a GitHub repository page.');
             return;
         }
+        if (!match[3]) {
+            window.location.href = https://github.com/${match[1]}/${match[2]}/network/members;
+        }
         const [_, mainUser, mainRepo] = match;
         const defaultBranch = await getDefaultBranch(mainUser, mainRepo);
 
