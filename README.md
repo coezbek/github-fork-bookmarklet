@@ -4,11 +4,22 @@ The Github network member fork page (`https://github.com/<user>/<repo>/network/m
 
 The following bookmarklet will retrieve this information using a call to `https://github.com/${user}/${repo}/branch-infobar/main` and update the list of forks. It will remove all forks which aren't ahead by at least one commit (because these are likely accidental forks).
 
-Caveats: This will take some time unforunately.
+Caveats: 
+ - This will take some time unforunately.
+ - If you aren't on the `networks/members` page, the bookmarklet will take you to the right page, but then you need to click the bookmarklet AGAIN.
 
 ```js
 javascript:(async () => {
     try {
+        const match = window.location.href.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)(\/network\/members\/?)?/);
+        if (!match) {
+            alert('Run this from a GitHub repository page.');
+            return;
+        }
+        if (!match[3]) {
+            window.location.href = `https://github.com/${match[1]}/${match[2]}/network/members`;
+        }
+
         /* Determine the main repository's default branch */
         const repoPath = window.location.pathname.split('/').slice(1, 3).join('/');
         const apiUrl = `https://api.github.com/repos/${repoPath}`;
