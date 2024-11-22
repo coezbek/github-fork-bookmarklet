@@ -100,69 +100,63 @@ Caveat: The forks page is paginated so you will only see a couple of entries at 
 
 ```js
 javascript:(async () => {
-    try {
-        /* Determine the main repository's default branch */
-        const repoPath = window.location.pathname.split('/').slice(1, 3).join('/');
-        const apiUrl = `https://api.github.com/repos/${repoPath}`;
-        const mainRepoResponse = await fetch(apiUrl);
-        if (!mainRepoResponse.ok) throw new Error('Failed to retrieve main repository information.');
-        const mainRepoData = await mainRepoResponse.json();
-        const defaultBranch = mainRepoData.default_branch;
-
-        const fetchBranchInfo = async (user, repo) => {
-            try {
-                const res = await fetch(`https://github.com/${user}/${repo}/branch-infobar/${defaultBranch}`, {
-                    headers: { accept: 'application/json' }
-                });
-                if (!res.ok) {
-                    throw new Error(`Failed to fetch branch info for ${user}/${repo}`);
-                }
-                const data = await res.json();
-                return data.refComparison;
-            } catch (e) {
-                console.error(`Error fetching branch info for ${user}/${repo}:`, e);
-                return null;
-            }
-        };
-
-        /* Select the list of forks on the Forks page */
-        const forkList = document.querySelectorAll('ul[data-view-component="true"] > li');
-        if (!forkList.length) {
-            alert('No forks found on this page.');
-            return;
+    /* Ensure the script is run on a valid GitHub repository page */
+    const ensureForksPage = () => {
+        const match = window.location.href.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)(\/forks\/?)?/);
+        if (!match) {
+            alert('Run this from a GitHub repository page.');
+            throw new Error('Not on a valid GitHub repository page.');
         }
+        if (!match[3]) {
+            window.location.href = `https://github.com/${match[1]}/${match[2]}/forks`;
+            throw new Error('Redirecting to the forks page.');
+        }
+        return { user: match[1], repo: match[2] };
+    };
 
-        /* Process each fork */
-        for (const forkItem of forkList) {
-            try {
-                /* Get the second link (user/repo) from the list item */
-                const repoLink = forkItem.querySelector('a[href*="/"]:nth-of-type(2)');
-                if (!repoLink) continue;
+    /* Fetch the default branch of a repository */
+    const getDefaultBranch = async (user, repo) => {
+        const res = await fetch(`https://api.github.com/repos/${user}/${repo}`);
+        if (!res.ok) throw new Error(`Failed to fetch default branch for ${user}/${repo}`);
+        return (await res.json()).default_branch;
+    };
 
-                const match = repoLink.href.match(/github\.com\/([^/]+)\/([^/]+)/);
-                if (!match) continue;
+    /* Fetch branch information */
+    const fetchBranchInfo = async (user, repo, branch) => {
+        try {
+            const res = await fetch(`https://github.com/${user}/${repo}/branch-infobar/${branch}`, { headers: { accept: 'application/json' } });
+            if (res.ok) return (await res.json()).refComparison;
+        } catch (e) {
+            console.error(`Error fetching branch info for ${user}/${repo}:`, e);
+        }
+        return null;
+    };
 
-                const [, user, repo] = match;
+    try {
+        /* Ensure on the forks page and get main repository details */
+        const { user: mainUser, repo: mainRepo } = ensureForksPage();
+        const defaultBranch = await getDefaultBranch(mainUser, mainRepo);
 
-                /* Fetch branch information */
-                const branchInfo = await fetchBranchInfo(user, repo);
-                if (branchInfo) {
-                    const { ahead, behind } = branchInfo;
-                    const infoText = `Ahead: <font color="#0c0">${ahead}</font>, Behind: <font color="red">${behind}</font>`;
-                    
-                    /* Create a div to display branch information */
-                    const infoDiv = document.createElement('div');
-                    infoDiv.innerHTML = infoText;
-                    infoDiv.style.marginTop = '10px';
-                    infoDiv.style.fontSize = 'small';
+        /* Process fork links */
+        const forks = [...document.querySelectorAll('ul[data-view-component="true"] > li')];
+        for (const fork of forks) {
+            const repoLink = fork.querySelector('a[href*="/"]:nth-of-type(2)');
+            const match = repoLink?.href.match(/github\.com\/([^/]+)\/([^/]+)/);
+            if (!match) continue;
 
-                    forkItem.appendChild(infoDiv);
-                    if (ahead === 0) {
-                        forkItem.style.display = 'none';
-                    }
-                }
-            } catch (e) {
-                console.error(`Error processing fork item:`, forkItem, e);
+            const [_, user, repo] = match;
+            let branchInfo = await fetchBranchInfo(user, repo, defaultBranch);
+            if (!branchInfo) branchInfo = await fetchBranchInfo(user, repo, await getDefaultBranch(user, repo));
+
+            if (branchInfo) {
+                const { ahead, behind } = branchInfo;
+                const info = `Ahead: <font color="#0c0">${ahead}</font>, Behind: <font color="red">${behind}</font>`;
+                const infoDiv = document.createElement('div');
+                infoDiv.innerHTML = info;
+                infoDiv.style.marginTop = '10px';
+                infoDiv.style.fontSize = 'small';
+                fork.appendChild(infoDiv);
+                if (ahead === 0) fork.style.display = 'none';
             }
         }
     } catch (e) {
