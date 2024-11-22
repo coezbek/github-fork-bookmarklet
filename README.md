@@ -1,6 +1,6 @@
 # github-fork-bookmarklet
 
-The Github fork page (`https://github.com/<user>/<repo>/network/members`) unfortunately doesn't show any information which forks are really active.
+The Github network member fork page (`https://github.com/<user>/<repo>/network/members`) unfortunately doesn't show any information which forks are really active.
 
 The following bookmarklet will retrieve this information using a call to `https://github.com/${user}/${repo}/branch-infobar/main` and update the list of forks. It will remove all forks which aren't ahead by at least one commit (because these are likely accidental forks).
 
