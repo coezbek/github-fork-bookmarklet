@@ -10,41 +10,36 @@ Caveats:
 
 ```js
 javascript:(async () => {
+    /* Function to fetch the default branch of a repository */
+    const getDefaultBranch = async (user, repo) => {
+        const response = await fetch(`https://api.github.com/repos/${user}/${repo}`);
+        if (!response.ok) throw new Error('Failed to retrieve repository information.');
+        return (await response.json()).default_branch;
+    };
+
+    /* Function to fetch branch information for a given user, repo, and branch */
+    const getBranchInfo = async (user, repo, branch) => {
+        try {
+            const response = await fetch(`https://github.com/${user}/${repo}/branch-infobar/${branch}`, { headers: { accept: 'application/json' } });
+            return response.ok ? (await response.json()).refComparison : null;
+        } catch (error) {
+            console.error(`Error fetching branch info for ${user}/${repo}:`, error);
+            return null;
+        }
+    };
+
     try {
+        /* Ensure the script runs on a GitHub repository page */
         const match = window.location.href.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)(\/network\/members\/?)?/);
         if (!match) {
             alert('Run this from a GitHub repository page.');
             return;
         }
-        if (!match[3]) {
-            window.location.href = `https://github.com/${match[1]}/${match[2]}/network/members`;
-        }
-
-        /* Determine the main repository's default branch */
-        const repoPath = window.location.pathname.split('/').slice(1, 3).join('/');
-        const apiUrl = `https://api.github.com/repos/${repoPath}`;
-        const mainRepoResponse = await fetch(apiUrl);
-        if (!mainRepoResponse.ok) throw new Error('Failed to retrieve main repository information.');
-        const mainRepoData = await mainRepoResponse.json();
-        const defaultBranch = mainRepoData.default_branch;
+        const [_, mainUser, mainRepo] = match;
+        const defaultBranch = await getDefaultBranch(mainUser, mainRepo);
 
         /* Collect all fork links excluding the original repo */
         const forkLinks = [...document.querySelectorAll('div.repo a:last-of-type')].slice(1);
-
-        /* Function to fetch branch information */
-        const getBranchInfo = async (user, repo) => {
-            const branchInfoUrl = `https://github.com/${user}/${repo}/branch-infobar/${defaultBranch}`;
-            try {
-                const response = await fetch(branchInfoUrl, { headers: { accept: 'application/json' } });
-                if (response.ok) {
-                    const data = await response.json();
-                    return data.refComparison;
-                }
-            } catch (error) {
-                console.error(`Error fetching branch info for ${user}/${repo}:`, error);
-            }
-            return null;
-        };
 
         for (const link of forkLinks) {
             try {
@@ -52,32 +47,27 @@ javascript:(async () => {
                 const [_, user, repo] = link.href.match(/github\.com\/([^/]+)\/([^/]+)/) || [];
                 if (!user || !repo) continue;
 
-                /* Fetch branch information for the current fork */
-                const branchInfo = await getBranchInfo(user, repo);
+                /* Attempt to fetch branch information, with fallback to repo's default branch */
+                let branchInfo = await getBranchInfo(user, repo, defaultBranch);
+                if (!branchInfo) branchInfo = await getBranchInfo(user, repo, await getDefaultBranch(user, repo));
 
                 /* Check downstream forks for modifications */
                 const childLinks = [...link.closest('.repo').querySelectorAll('.network-tree + a')];
-                let childrenHaveMods = false;
-                for (const childLink of childLinks) {
+                const childrenHaveMods = await Promise.all(childLinks.map(async (childLink) => {
                     const [_, childUser, childRepo] = childLink.href.match(/github\.com\/([^/]+)\/([^/]+)/) || [];
                     if (childUser && childRepo) {
-                        const childBranchInfo = await getBranchInfo(childUser, childRepo);
-                        if (childBranchInfo && childBranchInfo.ahead > 0) {
-                            childrenHaveMods = true;
-                            break;
-                        }
+                        const childBranchInfo = await getBranchInfo(childUser, childRepo, defaultBranch);
+                        return childBranchInfo && childBranchInfo.ahead > 0;
                     }
-                }
+                    return false;
+                })).then(results => results.some(Boolean));
 
-                /* Process display and information rendering */
+                /* Hide or show branch details for forks based on modifications */
                 if (branchInfo) {
                     const { ahead, behind } = branchInfo;
-
-                    /* Hide forks with no modifications and no downstream modifications */
                     if (ahead === 0 && !childrenHaveMods) {
                         link.closest('.repo').style.display = 'none';
                     } else {
-                        /* Show branch details for forks with modifications */
                         const branchDetails = `Ahead: <font color="#0c0">${ahead}</font>, Behind: <font color="red">${behind}</font>`;
                         link.insertAdjacentHTML('afterend', ` - ${branchDetails}`);
                     }
@@ -86,8 +76,8 @@ javascript:(async () => {
                 console.error(`Error processing link: ${link.href}`, error);
             }
         }
-    } catch (globalError) {
-        console.error('Error in bookmarklet execution:', globalError);
+    } catch (error) {
+        console.error('Error in bookmarklet execution:', error);
     }
 })();
 ```
